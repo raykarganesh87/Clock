@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111111">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>Photo Clock</title>
+<style>
+:root{--bg:#f2f2f2;--fg:#1a1a1a;--muted:#666;--btn:#1a1a1a;--btnfg:#fff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e0e0e;--fg:#f0f0f0;--muted:#999;--btn:#f0f0f0;--btnfg:#111}}
+:root[data-theme="dark"]{--bg:#0e0e0e;--fg:#f0f0f0;--muted:#999;--btn:#f0f0f0;--btnfg:#111}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;overflow:hidden;-webkit-tap-highlight-color:transparent}
+.clock{position:relative;width:min(92vw,62vh);height:min(92vw,62vh);border-radius:50%;
+box-shadow:0 8px 30px rgba(0,0,0,.35);background:#555 center/cover no-repeat;overflow:hidden;touch-action:manipulation}
+.clock::after{content:"";position:absolute;inset:0;border-radius:50%;box-shadow:inset 0 0 0 6px rgba(255,255,255,.85),inset 0 0 40px rgba(0,0,0,.35)}
+svg{position:absolute;inset:0;width:100%;height:100%}
+.date{font-size:1.1rem;color:var(--muted);letter-spacing:.04em}
+.row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+button{background:var(--btn);color:var(--btnfg);border:0;border-radius:999px;padding:12px 20px;font-size:1rem;font-family:inherit}
+button.alt{background:transparent;color:var(--fg);border:1px solid var(--muted)}
+input[type=file]{display:none}
+.hint{font-size:.8rem;color:var(--muted);text-align:center;max-width:300px;margin:0}
+</style>
+</head>
+<body>
+<div class="clock" id="clock">
+  <svg viewBox="0 0 200 200" aria-label="Analog clock">
+    <g id="ticks"></g>
+    <g id="nums" font-family="system-ui,sans-serif" font-weight="700" font-size="14" text-anchor="middle" fill="#fff" stroke="rgba(0,0,0,.6)" stroke-width="2.5" paint-order="stroke"></g>
+    <g style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))">
+      <line id="hh" x1="100" y1="108" x2="100" y2="58" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+      <line id="mh" x1="100" y1="110" x2="100" y2="34" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+      <line id="sh" x1="100" y1="118" x2="100" y2="26" stroke="#ff4d4d" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="100" cy="100" r="5" fill="#ff4d4d"/>
+    </g>
+  </svg>
+</div>
+<div class="date" id="date"></div>
+<div class="row">
+  <button id="pick">Choose my photo</button>
+  <button class="alt" id="sec">Seconds: on</button>
+</div>
+<input type="file" id="file" accept="image/*">
+<script>
+(function(){
+var NS="http://www.w3.org/2000/svg",KEY="photoClock.photo",SKEY="photoClock.sec";
+var clock=document.getElementById("clock"),ticks=document.getElementById("ticks"),nums=document.getElementById("nums");
+for(var i=0;i<60;i++){
+  var l=document.createElementNS(NS,"line"),big=i%5===0;
+  l.setAttribute("x1",100);l.setAttribute("x2",100);
+  l.setAttribute("y1",big?10:12);l.setAttribute("y2",big?20:16);
+  l.setAttribute("stroke","#fff");l.setAttribute("stroke-width",big?2.5:1);
+  l.setAttribute("opacity",big?1:.8);
+  l.setAttribute("transform","rotate("+i*6+" 100 100)");
+  ticks.appendChild(l);
+}
+for(var n=1;n<=12;n++){
+  var t=document.createElementNS(NS,"text"),a=n*30*Math.PI/180;
+  t.setAttribute("x",100+Math.sin(a)*74);
+  t.setAttribute("y",100-Math.cos(a)*74+5);
+  t.textContent=n;nums.appendChild(t);
+}
+var showSec=true;
+try{showSec=localStorage.getItem(SKEY)!=="off"}catch(e){}
+var secBtn=document.getElementById("sec"),sh=document.getElementById("sh");
+function applySec(){sh.style.display=showSec?"":"none";secBtn.textContent="Seconds: "+(showSec?"on":"off")}
+applySec();
+secBtn.onclick=function(){showSec=!showSec;applySec();try{localStorage.setItem(SKEY,showSec?"on":"off")}catch(e){}};
+
+function setPhoto(url){clock.style.backgroundImage="url("+url+")"}
+try{var saved=localStorage.getItem(KEY);if(saved)setPhoto(saved)}catch(e){}
+
+var file=document.getElementById("file");
+document.getElementById("pick").onclick=function(){file.click()};
+clock.addEventListener("dblclick",function(){file.click()});
+file.onchange=function(){
+  var f=file.files&&file.files[0];if(!f)return;
+  var img=new Image(),u=URL.createObjectURL(f);
+  img.onload=function(){
+    var s=700,c=document.createElement("canvas");c.width=c.height=s;
+    var m=Math.min(img.width,img.height),sx=(img.width-m)/2,sy=(img.height-m)/2;
+    c.getContext("2d").drawImage(img,sx,sy,m,m,0,0,s,s);
+    var d=c.toDataURL("image/jpeg",.85);
+    setPhoto(d);
+    try{localStorage.setItem(KEY,d)}catch(e){}
+    URL.revokeObjectURL(u);
+  };
+  img.src=u;
+};
+
+var hh=document.getElementById("hh"),mh=document.getElementById("mh"),dateEl=document.getElementById("date");
+var lastDay="";
+function tick(){
+  var d=new Date(),ms=d.getMilliseconds(),s=d.getSeconds()+ms/1000,m=d.getMinutes()+s/60,h=(d.getHours()%12)+m/60;
+  hh.setAttribute("transform","rotate("+h*30+" 100 100)");
+  mh.setAttribute("transform","rotate("+m*6+" 100 100)");
+  sh.setAttribute("transform","rotate("+s*6+" 100 100)");
+  var ds=d.toDateString();
+  if(ds!==lastDay){lastDay=ds;dateEl.textContent=d.toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"})}
+  requestAnimationFrame(tick);
+}
+tick();
+})();
+if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})}
+</script>
+</body>
+</html>
